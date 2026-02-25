@@ -186,9 +186,10 @@ export default function DashboardPage() {
 
                     const completedDates = new Set(
                         typedSessions
-                            .filter((s) => s.completed_at !== null)
-                            .map((s) => {
-                                const d = new Date(s.completed_at);
+                            .map((s) => s.completed_at)
+                            .filter((completedAt): completedAt is string => completedAt !== null)
+                            .map((completedAt) => {
+                                const d = new Date(completedAt);
                                 d.setHours(0, 0, 0, 0);
                                 return d.getTime();
                             })
@@ -223,7 +224,7 @@ export default function DashboardPage() {
                                 subject: exam.subject,
                                 score: percentage,
                                 total_questions: totalQuestions,
-                                completed_at: s.completed_at,
+                                completed_at: s.completed_at ?? s.started_at,
                                 is_best: true,
                             };
                         } else if (percentage === examScores[exam.id].score) {
@@ -236,7 +237,7 @@ export default function DashboardPage() {
                             exam_id: s.exam_id,
                             score: s.score,
                             started_at: s.started_at,
-                            completed_at: s.completed_at,
+                            completed_at: s.completed_at ?? s.started_at,
                             exam_title: exam.title,
                             total_questions: totalQuestions,
                             exam_subject: exam.subject,
@@ -504,8 +505,8 @@ export default function DashboardPage() {
                                                         <Trophy className="h-3 w-3 text-amber" />
                                                     )}
                                                     <span className={`text-xs md:text-sm font-semibold ${exam.score >= 70 ? "text-emerald" :
-                                                            exam.score >= 50 ? "text-amber" :
-                                                                "text-red-500"
+                                                        exam.score >= 50 ? "text-amber" :
+                                                            "text-red-500"
                                                         }`}>
                                                         {exam.score}%
                                                     </span>
@@ -514,8 +515,8 @@ export default function DashboardPage() {
                                             <div className="h-1.5 md:h-2 bg-muted rounded-full overflow-hidden">
                                                 <div
                                                     className={`h-full rounded-full ${exam.score >= 70 ? "bg-emerald" :
-                                                            exam.score >= 50 ? "bg-amber" :
-                                                                "bg-red-500"
+                                                        exam.score >= 50 ? "bg-amber" :
+                                                            "bg-red-500"
                                                         }`}
                                                     style={{ width: `${exam.score}%` }}
                                                 />
@@ -634,8 +635,8 @@ export default function DashboardPage() {
                                                         </td>
                                                         <td className="py-2 md:py-3">
                                                             <span className={`font-semibold ${score >= 70 ? "text-emerald" :
-                                                                    score >= 50 ? "text-amber" :
-                                                                        "text-red-500"
+                                                                score >= 50 ? "text-amber" :
+                                                                    "text-red-500"
                                                                 }`}>
                                                                 {score}%
                                                             </span>
