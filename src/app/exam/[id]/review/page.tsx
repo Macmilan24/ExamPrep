@@ -43,6 +43,7 @@ export default function ReviewPage() {
     const [allQuestions, setAllQuestions] = useState<Question[]>([]);
     const [savedAnswers, setSavedAnswers] = useState<Record<string, string>>({});
     const [savedConfidences, setSavedConfidences] = useState<Record<string, ConfidenceLevel>>({});
+    const [savedIsCorrect, setSavedIsCorrect] = useState<Record<string, boolean>>({});
     const [loading, setLoading] = useState(false);
 
     // Merge store answers with saved answers (saved takes precedence for showing results)
@@ -72,12 +73,13 @@ export default function ReviewPage() {
             // Load saved answers
             const { data: savedAnswersData } = await supabase
                 .from("user_answers")
-                .select("question_id, selected_option, confidence_level")
+                .select("question_id, selected_option, confidence_level, is_correct")
                 .eq("session_id", session.id);
 
             if (savedAnswersData && savedAnswersData.length > 0) {
                 const answersMap: Record<string, string> = {};
                 const confidencesMap: Record<string, ConfidenceLevel> = {};
+                const isCorrectMap: Record<string, boolean> = {};
 
                 savedAnswersData.forEach((ans) => {
                     if (ans.selected_option) {
@@ -86,10 +88,14 @@ export default function ReviewPage() {
                     if (ans.confidence_level) {
                         confidencesMap[ans.question_id] = ans.confidence_level;
                     }
+                    if (typeof ans.is_correct === "boolean") {
+                        isCorrectMap[ans.question_id] = ans.is_correct;
+                    }
                 });
 
                 setSavedAnswers(answersMap);
                 setSavedConfidences(confidencesMap);
+                setSavedIsCorrect(isCorrectMap);
             }
         }
 
@@ -139,10 +145,17 @@ export default function ReviewPage() {
             if (!answer) {
                 skipped++;
             } else {
-                // Compare answer letter or text with correct_answer
-                const isCorrect =
-                    answer === q.correct_answer ||
-                    q.options[answer as keyof typeof q.options] === q.correct_answer;
+                // If we have saved is_correct status, use it
+                let isCorrect = false;
+
+                if (savedIsCorrect[q.id] !== undefined) {
+                    isCorrect = savedIsCorrect[q.id];
+                } else {
+                    // Fallback to manual check (e.g. if just finished and not loaded from DB yet)
+                    isCorrect =
+                        answer === q.correct_answer ||
+                        q.options[answer as keyof typeof q.options] === q.correct_answer;
+                }
 
                 if (isCorrect) {
                     correct++;
@@ -154,7 +167,7 @@ export default function ReviewPage() {
         });
 
         return { correct, wrong, skipped, total: allQuestions.length, topicStats };
-    }, [allQuestions, displayAnswers]);
+    }, [allQuestions, displayAnswers, savedIsCorrect]);
 
     const percentage = results.total > 0
         ? Math.round((results.correct / results.total) * 100)
@@ -168,16 +181,21 @@ export default function ReviewPage() {
     const getQuestionStatus = (q: Question) => {
         const answer = displayAnswers[q.id];
         if (!answer) return "skipped";
+
+        if (savedIsCorrect[q.id] !== undefined) {
+            return savedIsCorrect[q.id] ? "correct" : "wrong";
+        }
+
         const isCorrect =
             answer === q.correct_answer ||
             q.options[answer as keyof typeof q.options] === q.correct_answer;
         return isCorrect ? "correct" : "wrong";
     };
 
-    if (loading) {
+    if (loading && allQuestions.length === 0) {
         return (
-            <div className="flex h-[60vh] items-center justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-emerald" />
+            <div className="flex justify-center items-center min-h-screen">
+                <Loader2 className="animate-spin h-8 w-8 text-emerald" />
             </div>
         );
     }
@@ -354,6 +372,7 @@ export default function ReviewPage() {
                             question={selectedQuestion}
                             userAnswer={displayAnswers[selectedQuestion.id]}
                             confidence={displayConfidences[selectedQuestion.id]}
+                            isCorrectOverride={savedIsCorrect[selectedQuestion.id]}
                         />
                     )}
                 </SheetContent>
@@ -366,17 +385,20 @@ function ExplanationContent({
     question,
     userAnswer,
     confidence,
+    isCorrectOverride,
 }: {
     question: Question;
     userAnswer?: string;
     confidence?: string;
+    isCorrectOverride?: boolean;
 }) {
     const exp = question.explanation as QuestionExplanation | undefined;
-    const isCorrect =
-        userAnswer === question.correct_answer ||
-        (userAnswer &&
-            question.options[userAnswer as keyof typeof question.options] ===
-            question.correct_answer);
+    const isCorrect = isCorrectOverride !== undefined
+        ? isCorrectOverride
+        : (userAnswer === question.correct_answer ||
+            (userAnswer &&
+                question.options[userAnswer as keyof typeof question.options] ===
+                question.correct_answer));
 
     // Find the correct letter
     const correctLetter = Object.entries(question.options).find(

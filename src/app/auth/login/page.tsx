@@ -25,13 +25,17 @@ function LoginForm() {
         setLoading(true);
         setError(null);
 
-        const { error: signInError } = await signIn(email, password);
+        const { data, error: signInError } = await signIn(email, password);
 
         if (signInError) {
             setError(signInError.message);
             setLoading(false);
-        } else {
+        } else if (data.session) {
+            router.refresh(); // Ensure server components re-validate session
             router.push(redirect);
+        } else {
+            // Should not happen if no error and no session, but safe to stop loading
+            setLoading(false);
         }
     };
 

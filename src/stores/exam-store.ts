@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import type { Question, ConfidenceLevel } from "@/lib/supabase/types";
 
 interface QuestionResult {
@@ -50,145 +51,33 @@ interface ExamState {
     reset: () => void;
 }
 
-export const useExamStore = create<ExamState>((set, get) => ({
-    questions: [],
-    examId: null,
-    examTitle: "",
-    sessionId: null,
-    currentIndex: 0,
-    answers: {},
-    confidences: {},
-    flags: new Set(),
-    strikethroughs: {},
-    results: {},
-    timeRemaining: 150 * 60,
-    isRunning: false,
-    isSubmitted: false,
-
-    initExam: (examId, title, questions, timeLimitMinutes) =>
-        set({
-            examId,
-            examTitle: title,
-            questions,
-            currentIndex: 0,
-            answers: {},
-            confidences: {},
-            flags: new Set(),
-            strikethroughs: {},
-            results: {},
-            timeRemaining: timeLimitMinutes * 60,
-            isRunning: true,
-            isSubmitted: false,
-            sessionId: null,
-        }),
-
-    setSessionId: (sessionId) => set({ sessionId }),
-
-    loadSavedAnswers: (answers, confidences) =>
-        set({
-            answers,
-            confidences,
-            isRunning: false,
-            isSubmitted: true,
-        }),
-
-    goToQuestion: (index) => {
-        const { questions } = get();
-        if (index >= 0 && index < questions.length) {
-            set({ currentIndex: index });
-        }
-    },
-
-    nextQuestion: () => {
-        const { currentIndex, questions } = get();
-        if (currentIndex < questions.length - 1) {
-            set({ currentIndex: currentIndex + 1 });
-        }
-    },
-
-    prevQuestion: () => {
-        const { currentIndex } = get();
-        if (currentIndex > 0) {
-            set({ currentIndex: currentIndex - 1 });
-        }
-    },
-
-    selectAnswer: (questionId, option) =>
-        set((state) => ({
-            answers: { ...state.answers, [questionId]: option },
-        })),
-
-    setConfidence: (questionId, level) =>
-        set((state) => ({
-            confidences: { ...state.confidences, [questionId]: level },
-        })),
-
-    toggleFlag: (questionId) =>
-        set((state) => {
-            const newFlags = new Set(state.flags);
-            if (newFlags.has(questionId)) {
-                newFlags.delete(questionId);
-            } else {
-                newFlags.add(questionId);
+// Custom storage to handle Set serialization/deserialization
+const storage = {
+    getItem: (name: string) => {
+        const str = localStorage.getItem(name);
+        if (!str) return null;
+        return JSON.parse(str, (_key, value) => {
+            if (value && typeof value === "object" && value.__type === "Set") {
+                return new Set(value.value);
             }
-            return { flags: newFlags };
-        }),
-
-    toggleStrikethrough: (questionId, option) =>
-        set((state) => {
-            const current = state.strikethroughs[questionId] || new Set();
-            const newSet = new Set(current);
-            if (newSet.has(option)) {
-                newSet.delete(option);
-            } else {
-                newSet.add(option);
-            }
-return {
-                strikethroughs: { ...state.strikethroughs, [questionId]: newSet },
-            };
-        }),
-
-    checkAnswer: (questionId) => {
-        const { questions, answers } = get();
-        const question = questions.find((q) => q.id === questionId);
-        if (!question) return false;
-
-        const selectedOption = answers[questionId];
-        if (!selectedOption) return false;
-
-        const isCorrect = 
-            selectedOption === question.correct_answer ||
-            question.options[selectedOption as keyof typeof question.options] === question.correct_answer;
-        
-        set((state) => ({
-            results: {
-                ...state.results,
-                [questionId]: { isCorrect, showResult: true },
-            },
-        }));
-        return isCorrect;
+            return value;
+        });
     },
-
-    hideResult: (questionId) =>
-        set((state) => ({
-            results: {
-                ...state.results,
-                [questionId]: { ...state.results[questionId], showResult: false },
-            },
-        })),
-
-    tick: () =>
-        set((state) => {
-            if (state.timeRemaining <= 0) {
-                return { isRunning: false, timeRemaining: 0 };
+    setItem: (name: string, value: unknown) => {
+        const str = JSON.stringify(value, (_key, value) => {
+            if (value instanceof Set) {
+                return { __type: "Set", value: Array.from(value) };
             }
-            return { timeRemaining: state.timeRemaining - 1 };
-        }),
+            return value;
+        });
+        localStorage.setItem(name, str);
+    },
+    removeItem: (name: string) => localStorage.removeItem(name),
+};
 
-    submitExam: () => set({ isSubmitted: true, isRunning: false }),
-
-reset: () =>
-        set({
+export const useExamStore = create<ExamState>()(
+    persist(
+        (set, get) => ({
             questions: [],
             examId: null,
             examTitle: "",
@@ -202,5 +91,148 @@ reset: () =>
             timeRemaining: 150 * 60,
             isRunning: false,
             isSubmitted: false,
+
+            initExam: (examId, title, questions, timeLimitMinutes) =>
+                set({
+                    examId,
+                    examTitle: title,
+                    questions,
+                    currentIndex: 0,
+                    answers: {},
+                    confidences: {},
+                    flags: new Set(),
+                    strikethroughs: {},
+                    results: {},
+                    timeRemaining: timeLimitMinutes * 60,
+                    isRunning: true,
+                    isSubmitted: false,
+                    sessionId: null,
+                }),
+
+            setSessionId: (sessionId) => set({ sessionId }),
+
+            loadSavedAnswers: (answers, confidences) =>
+                set({
+                    answers,
+                    confidences,
+                    isRunning: false,
+                    isSubmitted: true,
+                }),
+
+            goToQuestion: (index) => {
+                const { questions } = get();
+                if (index >= 0 && index < questions.length) {
+                    set({ currentIndex: index });
+                }
+            },
+
+            nextQuestion: () => {
+                const { currentIndex, questions } = get();
+                if (currentIndex < questions.length - 1) {
+                    set({ currentIndex: currentIndex + 1 });
+                }
+            },
+
+            prevQuestion: () => {
+                const { currentIndex } = get();
+                if (currentIndex > 0) {
+                    set({ currentIndex: currentIndex - 1 });
+                }
+            },
+
+            selectAnswer: (questionId, option) =>
+                set((state) => ({
+                    answers: { ...state.answers, [questionId]: option },
+                })),
+
+            setConfidence: (questionId, level) =>
+                set((state) => ({
+                    confidences: { ...state.confidences, [questionId]: level },
+                })),
+
+            toggleFlag: (questionId) =>
+                set((state) => {
+                    const newFlags = new Set(state.flags);
+                    if (newFlags.has(questionId)) {
+                        newFlags.delete(questionId);
+                    } else {
+                        newFlags.add(questionId);
+                    }
+                    return { flags: newFlags };
+                }),
+
+            toggleStrikethrough: (questionId, option) =>
+                set((state) => {
+                    const current = state.strikethroughs[questionId] || new Set();
+                    const newSet = new Set(current);
+                    if (newSet.has(option)) {
+                        newSet.delete(option);
+                    } else {
+                        newSet.add(option);
+                    }
+                    return {
+                        strikethroughs: { ...state.strikethroughs, [questionId]: newSet },
+                    };
+                }),
+
+            checkAnswer: (questionId) => {
+                const { questions, answers } = get();
+                const question = questions.find((q) => q.id === questionId);
+                if (!question) return false;
+
+                const selectedOption = answers[questionId];
+                if (!selectedOption) return false;
+
+                const isCorrect =
+                    selectedOption === question.correct_answer ||
+                    question.options[selectedOption as keyof typeof question.options] === question.correct_answer;
+
+                set((state) => ({
+                    results: {
+                        ...state.results,
+                        [questionId]: { isCorrect, showResult: true },
+                    },
+                }));
+                return isCorrect;
+            },
+
+            hideResult: (questionId) =>
+                set((state) => ({
+                    results: {
+                        ...state.results,
+                        [questionId]: { ...state.results[questionId], showResult: false },
+                    },
+                })),
+
+            tick: () =>
+                set((state) => {
+                    if (state.timeRemaining <= 0) {
+                        return { isRunning: false, timeRemaining: 0 };
+                    }
+                    return { timeRemaining: state.timeRemaining - 1 };
+                }),
+
+            submitExam: () => set({ isSubmitted: true, isRunning: false }),
+
+            reset: () =>
+                set({
+                    questions: [],
+                    examId: null,
+                    examTitle: "",
+                    sessionId: null,
+                    currentIndex: 0,
+                    answers: {},
+                    confidences: {},
+                    flags: new Set(),
+                    strikethroughs: {},
+                    results: {},
+                    timeRemaining: 150 * 60,
+                    isRunning: false,
+                    isSubmitted: false,
+                }),
         }),
-}));
+        {
+            name: "exam-storage",
+            storage: storage,
+        }
+    ));

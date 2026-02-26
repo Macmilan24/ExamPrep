@@ -86,9 +86,16 @@ export default function ExamPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [showSubmitDialog, setShowSubmitDialog] = useState(false);
-    const [showMap, setShowMap] = useState(true);
+    const [showMap, setShowMap] = useState(false);
     const [showExplanationSheet, setShowExplanationSheet] = useState(false);
     const { user } = useAuth();
+
+    // Initialize map visibility based on screen width
+    useEffect(() => {
+        if (typeof window !== "undefined" && window.innerWidth >= 1024) {
+            setShowMap(true);
+        }
+    }, []);
 
     const {
         questions,
@@ -370,7 +377,7 @@ export default function ExamPage() {
                     >
                         <X className="h-4 w-4" />
                     </Button>
-                    <span className="text-sm font-medium text-muted-foreground truncate max-w-[200px]">
+                    <span className="hidden sm:block text-sm font-medium text-muted-foreground truncate max-w-[200px]">
                         {useExamStore.getState().examTitle}
                     </span>
                 </div>
@@ -403,7 +410,7 @@ export default function ExamPage() {
                 </div>
             </header>
 
-            <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-1 overflow-hidden relative">
                 {/* Question Map Sidebar */}
                 <AnimatePresence>
                     {showMap && (
@@ -412,9 +419,15 @@ export default function ExamPage() {
                             animate={{ width: 280, opacity: 1 }}
                             exit={{ width: 0, opacity: 0 }}
                             transition={{ duration: 0.2 }}
-                            className="shrink-0 overflow-y-auto border-r border-border/50 bg-card/50 p-4"
+                            className="absolute inset-y-0 left-0 z-20 w-full border-r border-border/50 bg-background p-4 md:static md:w-[280px] md:bg-card/50 md:shrink-0 overflow-y-auto"
                         >
-                            <p className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                            <div className="flex items-center justify-between mb-3 md:hidden">
+                                <span className="text-sm font-medium">Question Map</span>
+                                <Button variant="ghost" size="icon" onClick={() => setShowMap(false)}>
+                                    <X className="h-4 w-4" />
+                                </Button>
+                            </div>
+                            <p className="hidden md:block mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                                 Question Map
                             </p>
                             <div className="grid grid-cols-5 gap-1.5">
@@ -489,7 +502,7 @@ export default function ExamPage() {
 
                 {/* Main Question Area */}
                 <div className="flex flex-1 flex-col overflow-y-auto">
-                    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-6 py-8 md:px-12 md:py-12">
+                    <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col px-4 py-6 pb-24 md:px-12 md:py-12 md:pb-12">
                         {/* Question header */}
                         <div className="mb-6 flex items-center justify-between">
                             <div className="flex items-center gap-3">
@@ -537,15 +550,15 @@ export default function ExamPage() {
                                             const isStruckThrough = currentStrikethroughs.has(letter);
 
                                             return (
-                                                <div key={letter} className="flex items-center gap-2">
+                                                <div key={letter} className="flex items-stretch gap-3">
                                                     <button
                                                         onClick={() => {
                                                             if (!isStruckThrough) {
                                                                 selectAnswer(currentQuestion.id, letter);
                                                             }
                                                         }}
-                                                        className={`flex flex-1 items-center gap-4 rounded-xl border p-4 text-left transition-all ${isStruckThrough
-                                                            ? "strikethrough-option border-border/30 cursor-not-allowed"
+                                                        className={`flex flex-1 items-center gap-4 rounded-xl border p-4 text-left transition-all active:scale-[0.99] touch-manipulation ${isStruckThrough
+                                                            ? "strikethrough-option border-border/30 cursor-not-allowed opacity-60"
                                                             : isSelected
                                                                 ? "border-emerald bg-emerald/10 shadow-sm"
                                                                 : "border-border/50 bg-card/50 hover:border-border hover:bg-card"
@@ -569,12 +582,13 @@ export default function ExamPage() {
                                                                 onClick={() =>
                                                                     toggleStrikethrough(currentQuestion.id, letter)
                                                                 }
-                                                                className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold transition-all ${isStruckThrough
-                                                                    ? "bg-destructive/15 text-destructive"
-                                                                    : "bg-secondary/50 text-muted-foreground hover:bg-secondary"
+                                                                className={`flex h-auto w-12 shrink-0 items-center justify-center rounded-xl border transition-all touch-manipulation ${isStruckThrough
+                                                                    ? "bg-destructive/15 text-destructive border-destructive/20"
+                                                                    : "bg-secondary/30 text-muted-foreground hover:bg-secondary border-transparent"
                                                                     }`}
+                                                                aria-label={isStruckThrough ? "Remove strike-through" : "Eliminate option"}
                                                             >
-                                                                ✕
+                                                                <span className="text-lg font-bold">✕</span>
                                                             </button>
                                                         </TooltipTrigger>
                                                         <TooltipContent>
@@ -597,8 +611,8 @@ export default function ExamPage() {
                                 initial={{ opacity: 0, y: 12 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 className={`mt-6 rounded-xl border p-4 ${currentResult.isCorrect
-                                        ? "border-emerald/50 bg-emerald/5"
-                                        : "border-destructive/50 bg-destructive/5"
+                                    ? "border-emerald/50 bg-emerald/5"
+                                    : "border-destructive/50 bg-destructive/5"
                                     }`}
                             >
                                 <div className="flex items-center justify-between mb-3">
@@ -665,7 +679,7 @@ export default function ExamPage() {
                                 <p className="mb-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
                                     How confident are you?
                                 </p>
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap gap-2">
                                     {(
                                         Object.entries(confidenceConfig) as [
                                             ConfidenceLevel,
@@ -697,7 +711,7 @@ export default function ExamPage() {
                         )}
 
                         {/* Navigation */}
-                        <div className="mt-auto flex items-center justify-between pt-8">
+                        <div className="fixed bottom-0 left-0 right-0 gap-4 bg-background border-t p-4 z-10 flex items-center justify-between md:static md:bg-transparent md:border-0 md:p-0 md:mt-auto md:pt-8">
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -706,44 +720,60 @@ export default function ExamPage() {
                                 onClick={prevQuestion}
                             >
                                 <ChevronLeft className="h-4 w-4" />
-                                Previous
+                                <span className="hidden sm:inline">Previous</span>
+                                <span className="sm:hidden">Prev</span>
                             </Button>
 
-                            <span className="text-xs text-muted-foreground">
+                            <span className="hidden md:inline text-xs text-muted-foreground">
                                 {answeredCount} / {questions.length} answered
                             </span>
 
-                            {currentAnswer && !hasCheckedAnswer ? (
-                                <Button
-                                    size="sm"
-                                    className="gap-1.5 rounded-full bg-emerald text-emerald-foreground hover:bg-emerald/90"
-                                    onClick={() => checkAnswer(currentQuestion.id)}
-                                >
-                                    Check Answer
-                                    <CheckCircle2 className="h-4 w-4" />
-                                </Button>
-                            ) : hasCheckedAnswer ? (
-                                <Button
-                                    size="sm"
-                                    className="gap-1.5 rounded-full bg-emerald text-emerald-foreground hover:bg-emerald/90"
-                                    disabled={currentIndex === questions.length - 1}
-                                    onClick={nextQuestion}
-                                >
-                                    Next Question
-                                    <ChevronRight className="h-4 w-4" />
-                                </Button>
-                            ) : (
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="gap-1.5 rounded-full"
-                                    disabled={currentIndex === questions.length - 1}
-                                    onClick={nextQuestion}
-                                >
-                                    Next
-                                    <ChevronRight className="h-4 w-4" />
-                                </Button>
-                            )}
+                            <div className="flex gap-2">
+                                {(currentAnswer && !hasCheckedAnswer && currentIndex !== questions.length - 1) && (
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={nextQuestion}
+                                    >
+                                        Skip
+                                        <ChevronRight className="ml-1 h-4 w-4" />
+                                    </Button>
+                                )}
+
+                                {currentAnswer && !hasCheckedAnswer ? (
+                                    <Button
+                                        size="sm"
+                                        className="gap-1.5 rounded-full bg-emerald text-emerald-foreground hover:bg-emerald/90"
+                                        onClick={() => checkAnswer(currentQuestion.id)}
+                                    >
+                                        <span className="hidden sm:inline">Check Answer</span>
+                                        <span className="sm:hidden">Check</span>
+                                        <CheckCircle2 className="h-4 w-4" />
+                                    </Button>
+                                ) : hasCheckedAnswer ? (
+                                    <Button
+                                        size="sm"
+                                        className="gap-1.5 rounded-full bg-emerald text-emerald-foreground hover:bg-emerald/90"
+                                        disabled={currentIndex === questions.length - 1}
+                                        onClick={nextQuestion}
+                                    >
+                                        <span className="hidden sm:inline">Next Question</span>
+                                        <span className="sm:hidden">Next</span>
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-1.5 rounded-full"
+                                        disabled={currentIndex === questions.length - 1}
+                                        onClick={nextQuestion}
+                                    >
+                                        Next
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -849,18 +879,18 @@ function ExamExplanationContent({
                         <div
                             key={letter}
                             className={`flex items-center gap-3 rounded-lg border p-3 text-sm ${isCorrectOption
-                                    ? "border-emerald/40 bg-emerald/5"
-                                    : isUserChoice
-                                        ? "border-destructive/40 bg-destructive/5"
-                                        : "border-border/30"
+                                ? "border-emerald/40 bg-emerald/5"
+                                : isUserChoice
+                                    ? "border-destructive/40 bg-destructive/5"
+                                    : "border-border/30"
                                 }`}
                         >
                             <span
                                 className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs font-semibold ${isCorrectOption
-                                        ? "bg-emerald text-emerald-foreground"
-                                        : isUserChoice
-                                            ? "bg-destructive text-white"
-                                            : "bg-secondary text-muted-foreground"
+                                    ? "bg-emerald text-emerald-foreground"
+                                    : isUserChoice
+                                        ? "bg-destructive text-white"
+                                        : "bg-secondary text-muted-foreground"
                                     }`}
                             >
                                 {letter}

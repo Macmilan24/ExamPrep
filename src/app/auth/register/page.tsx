@@ -15,7 +15,7 @@ export default function RegisterPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const { signUp } = useAuth();
     const router = useRouter();
 
@@ -23,14 +23,20 @@ export default function RegisterPage() {
         e.preventDefault();
         setLoading(true);
         setError(null);
+        setSuccessMessage(null);
 
-        const { error: signUpError } = await signUp(email, password, name);
+        const { data, error: signUpError } = await signUp(email, password, name);
 
         if (signUpError) {
             setError(signUpError.message);
             setLoading(false);
-        } else {
+        } else if (data?.session) {
+            router.refresh();
             router.push("/dashboard");
+        } else {
+            // No session means email confirmation is likely required
+            setSuccessMessage("Registration successful! Please check your email to confirm your account.");
+            setLoading(false);
         }
     };
 
@@ -55,6 +61,11 @@ export default function RegisterPage() {
                 <Card className="border-border/50">
                     <CardContent className="p-6">
                         <form onSubmit={handleRegister} className="space-y-4">
+                            {successMessage && (
+                                <div className="p-3 text-sm rounded-md bg-emerald/10 text-emerald">
+                                    {successMessage}
+                                </div>
+                            )}
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Full Name</label>
                                 <div className="relative">
@@ -99,7 +110,7 @@ export default function RegisterPage() {
                                         required
                                     />
                                 </div>
-</div>
+                            </div>
 
                             {error && (
                                 <p className="text-sm text-red-500">{error}</p>
